@@ -235,17 +235,17 @@ class PointNetSetAbstractionMsg(nn.Module):
             points = points.permute(0, 2, 1)
 
         B, N, C = xyz.shape
-        S = self.npoint
-        new_xyz = index_points(xyz, farthest_point_sample(xyz, S))
+        S = self.npoint #number of sampled points, less than the number of input points
+        new_xyz = index_points(xyz, farthest_point_sample(xyz, S)) #the sampled points
         new_points_list = []
         for i, radius in enumerate(self.radius_list):
             K = self.nsample_list[i]
-            group_idx = query_ball_point(radius, K, xyz, new_xyz)
-            grouped_xyz = index_points(xyz, group_idx)
-            grouped_xyz -= new_xyz.view(B, S, 1, C)
+            group_idx = query_ball_point(radius, K, xyz, new_xyz) #neigbors INDICES of the sampled points
+            grouped_xyz = index_points(xyz, group_idx) #NEIGHBORS of the sampled points
+            grouped_xyz -= new_xyz.view(B, S, 1, C) #neigbors features are computed as relative to their original sampled points (substraction)
             if points is not None:
                 grouped_points = index_points(points, group_idx)
-                grouped_points = torch.cat([grouped_points, grouped_xyz], dim=-1)
+                grouped_points = torch.cat([grouped_points, grouped_xyz], dim=-1) #concate the NEIGHBORS FEATURES (grouped_xyz) with the previous NEIGH FEATURES (grouped_points) if available
             else:
                 grouped_points = grouped_xyz
 
@@ -253,7 +253,7 @@ class PointNetSetAbstractionMsg(nn.Module):
             for j in range(len(self.conv_blocks[i])):
                 conv = self.conv_blocks[i][j]
                 bn = self.bn_blocks[i][j]
-                grouped_points =  F.relu(bn(conv(grouped_points)))
+                grouped_points =  F.relu(bn(conv(grouped_points))) #FUSING the NEIGHBORS FEATURES (local geom. features)
             new_points = torch.max(grouped_points, 2)[0]  # [B, D', S]
             new_points_list.append(new_points)
 
